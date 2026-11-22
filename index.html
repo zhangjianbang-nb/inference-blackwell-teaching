@@ -516,9 +516,12 @@ function loadProgress(){
 }
 function saveProgress(p){ p.v=PSCHEMA; try{ localStorage.setItem(pkey(), JSON.stringify(p)); }catch(e){} }
 function trackables(){
-  var out=[];
-  arr(D && D.theory).forEach(function(x){ out.push(['theory',x.id]); });
-  arr(D && D.papers).forEach(function(x){ out.push(['paper',x.id]); });
+  var out=[], t=(D&&D.track)||{};
+  var th=arr(D&&D.theory), pa=arr(D&&D.papers);
+  var thIds=th.length?th.map(function(x){return x.id;}):(t.theory||[]);
+  var paIds=pa.length?pa.map(function(x){return x.id;}):(t.papers||[]);
+  thIds.forEach(function(id){ out.push(['theory',id]); });
+  paIds.forEach(function(id){ out.push(['paper',id]); });
   arr(D && D.stories).forEach(function(x){ out.push(['story',x.id]); });
   return out;
 }
@@ -743,7 +746,7 @@ function loadDomain(id, cb){
   if(LOADING) return;
   LOADING=true; LOAD_ERR='';
   var s=document.createElement('script');
-  s.src='data/domains/'+id+'/bundle.js';
+  s.src='data/domains/'+id+'/core.js';
   s.onload=function(){
     LOADING=false;
     if(window.SITE_DATA_BY_DOMAIN && window.SITE_DATA_BY_DOMAIN[id]){
@@ -752,8 +755,29 @@ function loadDomain(id, cb){
       cb();
     }else{ LOAD_ERR='数据文件已加载但没有注册该领域：'+id; route(); }
   };
-  s.onerror=function(){ LOADING=false; LOAD_ERR='加载失败：data/domains/'+id+'/bundle.js'; route(); };
+  s.onerror=function(){ LOADING=false; LOAD_ERR='加载失败：data/domains/'+id+'/core.js'; route(); };
   document.head.appendChild(s);
+}
+/* 按页懒加载：进入论文/理论/算法/题库/全书/附录页时才拉对应分片，
+   首页只加载 core.js（<1MB），不再一次性下载 16MB 的整域数据 */
+var CHUNK_FILES={papers:'sec-papers.js',theory:'sec-theory.js',algorithms:'sec-algorithms.js',assessments:'sec-exam.js',book:'sec-book.js',appendix:'sec-appendix.js'};
+var PAGE_NEEDS={papers:['papers'],deepdive:['papers','theory'],theory:['theory'],algos:['algorithms'],exam:['assessments'],book:['book'],appendix:['appendix'],map:['algorithms','papers']};
+function missingChunks(page){
+  var need=PAGE_NEEDS[page]||[], miss=[];
+  for(var i=0;i<need.length;i++){ if(D && !D[need[i]]) miss.push(need[i]); }
+  return miss;
+}
+function loadChunks(id, keys, cb){
+  var i=0;
+  function next(){
+    if(i>=keys.length){ cb(); return; }
+    var key=keys[i++], s=document.createElement('script');
+    s.src='data/domains/'+id+'/'+CHUNK_FILES[key];
+    s.onload=next;
+    s.onerror=function(){ LOAD_ERR='加载失败：data/domains/'+id+'/'+CHUNK_FILES[key]; route(); };
+    document.head.appendChild(s);
+  }
+  next();
 }
 function loadingHtml(){
   if(LOAD_ERR) return '<div class="empty">'+esc(LOAD_ERR)+'<br>请确认已运行 <code>python3 tools/build_long.py --domain '+esc(CUR||'&lt;id&gt;')+'</code>。</div>';
@@ -772,6 +796,16 @@ function safeDecode(x){try{return decodeURIComponent(x);}catch(e){return x;}}
 function renderPage(page,id){
   var fn=PAGES[page];
   document.body.classList.remove('nav-open');
+  var miss=missingChunks(page);
+  if(miss.length){
+    if(LOAD_ERR){
+      view.innerHTML='<section class="section"><h1>数据加载失败</h1><p class="note">'+esc(LOAD_ERR)+'</p></section>';
+      return;
+    }
+    view.innerHTML='<div class="empty">正在加载本页数据…</div>';
+    loadChunks(CUR,miss,function(){ renderPage(page,id); });
+    return;
+  }
   if(!fn){
     view.innerHTML='<section class="section"><h1>未找到该页面</h1><p class="note">地址 <code>#/'+esc(page)+'</code> 不存在。<a href="#/home">返回领域总览</a></p></section>';
     setActive('');
@@ -861,18 +895,19 @@ window.addEventListener('hashchange',route);
 
 /* ---------- stats ---------- */
 function stats(){
-  var dirs=arr(D.directions), algs=arr(D.algorithms), papers=arr(D.papers);
+  var c=(D&&D.counts)||{};
+  var dirs=arr(D.directions), algs=arr(D.algorithms), papers=arr(D.papers), th=arr(D.theory);
   return {
-    directions:dirs.length,
-    classic_algorithms:algs.filter(function(a){return a.tier==='classic';}).length,
-    core_papers:papers.filter(function(p){return p.type==='foundational'||p.type==='classic';}).length,
-    recent_papers:papers.filter(function(p){return p.type==='recent'||p.type==='latest';}).length,
-    total_papers:papers.length,
-    algorithms:algs.length,
-    papers:papers.length,
-    theory:arr(D.theory).length,
-    stories:arr(D.stories).length,
-    assessments:arr(D.assessments).length
+    directions:dirs.length||c.directions||0,
+    classic_algorithms:algs.length?algs.filter(function(a){return a.tier==='classic';}).length:(c.classic_algorithms||0),
+    core_papers:papers.length?papers.filter(function(p){return p.type==='foundational'||p.type==='classic';}).length:(c.core_papers||0),
+    recent_papers:papers.length?papers.filter(function(p){return p.type==='recent'||p.type==='latest';}).length:(c.recent_papers||0),
+    total_papers:papers.length||c.papers||0,
+    algorithms:algs.length||c.algorithms||0,
+    papers:papers.length||c.papers||0,
+    theory:th.length||c.theory||0,
+    stories:arr(D.stories).length||c.stories||0,
+    assessments:arr(D.assessments).length||c.assessments||0
   };
 }
 
