@@ -779,6 +779,15 @@ function loadChunks(id, keys, cb){
   }
   next();
 }
+/* 详情页正文单独按需加载：列表分片只带元数据，点进某一篇时才拉 body-<key>-<id>.js */
+var DETAIL_KEY={papers:'papers',deepdive:'papers',theory:'theory',algos:'algorithms',appendix:'appendix'};
+function missingBody(page,id){
+  var k=DETAIL_KEY[page];
+  if(!k||!id||!D) return null;
+  var it=byId(D[k],id);
+  if(!it||('long_html' in it)) return null;
+  return {key:k,id:id};
+}
 function loadingHtml(){
   if(LOAD_ERR) return '<div class="empty">'+esc(LOAD_ERR)+'<br>请确认已运行 <code>python3 tools/build_long.py --domain '+esc(CUR||'&lt;id&gt;')+'</code>。</div>';
   return '<div class="empty">正在加载领域数据…</div>';
@@ -804,6 +813,20 @@ function renderPage(page,id){
     }
     view.innerHTML='<div class="empty">正在加载本页数据…</div>';
     loadChunks(CUR,miss,function(){ renderPage(page,id); });
+    return;
+  }
+  var mb=missingBody(page,id);
+  if(mb){
+    if(LOAD_ERR){
+      view.innerHTML='<section class="section"><h1>数据加载失败</h1><p class="note">'+esc(LOAD_ERR)+'</p></section>';
+      return;
+    }
+    view.innerHTML='<div class="empty">正在加载正文…</div>';
+    var bs=document.createElement('script');
+    bs.src='data/domains/'+CUR+'/body-'+mb.key+'-'+String(mb.id).replace(/[^A-Za-z0-9_.-]/g,'_')+'.js';
+    bs.onload=function(){ renderPage(page,id); };
+    bs.onerror=function(){ LOAD_ERR='加载失败：正文 '+mb.id; route(); };
+    document.head.appendChild(bs);
     return;
   }
   if(!fn){
