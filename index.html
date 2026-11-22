@@ -463,7 +463,7 @@ function esc(s){
 }
 function arr(x){ return Array.isArray(x) ? x : []; }
 function byId(list,id){ var a=arr(list); for(var i=0;i<a.length;i++){ if(a[i].id===id) return a[i]; } return null; }
-function dirName(id){ var d=byId(D.directions,id); return d?d.name:id; }
+function dirName(id){ var d=byId(D&&D.directions,id); return d?d.name:id; }
 function paperTitle(id){ var p=byId(D.papers,id); return p?p.title:id; }
 function algName(id){ var a=byId(D.algorithms,id); return a?a.name:id; }
 function theoryTitle(id){ var t=byId(D.theory,id); return t?t.title:id; }
@@ -707,6 +707,7 @@ function renderGraph(){
 function buildStamp(){
   var el=document.getElementById('build-stamp');
   if(!el) return;
+  if(!D){ el.textContent=''; return; }
   var g=(typeof window!=='undefined'&&window.SITE_DATA_GENERATED)||'';
   var c=stats();
   var d=(D.domain||{}).stats||{};
@@ -918,8 +919,9 @@ window.addEventListener('hashchange',route);
 
 /* ---------- stats ---------- */
 function stats(){
-  var c=(D&&D.counts)||{};
-  var dirs=arr(D.directions), algs=arr(D.algorithms), papers=arr(D.papers), th=arr(D.theory);
+  var Dd=D||{};
+  var c=Dd.counts||{};
+  var dirs=arr(Dd.directions), algs=arr(Dd.algorithms), papers=arr(Dd.papers), th=arr(Dd.theory);
   return {
     directions:dirs.length||c.directions||0,
     classic_algorithms:algs.length?algs.filter(function(a){return a.tier==='classic';}).length:(c.classic_algorithms||0),
