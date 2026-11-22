@@ -943,7 +943,7 @@ PAGES.home=function(){
   var d=D.domain||{}, st=stats(), p=progressInfo(), cov=D.coverage||{};
   var statsHtml=[
     [st.directions,'研究方向'],[st.algorithms,'算法条目'],[st.papers,'论文条目'],
-    [arr(D.book&&D.book.sections).length,'全书卷数'],[st.theory,'理论课'],[st.assessments,'考核题']
+    [arr(D.book&&D.book.sections).length||((D.counts||{}).book||0),'全书卷数'],[st.theory,'理论课'],[st.assessments,'考核题']
   ].map(function(s){ return '<div class="stat"><b>'+s[0]+'</b><span>'+s[1]+'</span></div>'; }).join('');
   var path=arr(d.learning_path).map(function(g,i){
     return '<div class="card" style="padding:16px 18px"><div class="tag-row">'+chip('阶段 '+(i+1),'amber')+'</div>'+
